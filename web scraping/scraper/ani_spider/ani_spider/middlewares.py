@@ -16,7 +16,7 @@ class ScrapeOpsFakeBrowserHeaderAgentMiddleware:
         return cls(crawler.settings)
 
     def __init__(self, settings):
-        self.scrapeops_api_key = '1e70eeec-0efe-4ba4-96bc-00f6fffd8442'
+        self.scrapeops_api_key = 'api-key'
         self.scrapeops_endpoint = 'http://headers.scrapeops.io/v1/browser-headers'
         self.scrapeops_fake_browser_headers_active = True
         self.scrapeops_num_results = 1
