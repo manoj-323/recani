@@ -1,74 +1,72 @@
-import pandas as pd 
+import pandas as pd
 import numpy as np
 import pickle
 
+# Load dataset and similarity matrix
 df = pd.read_csv(r'C:\Users\22213\OneDrive\Desktop\recani\recani\word2vec_prac_dataset.csv')
-
 with open(r'C:\Users\22213\OneDrive\Desktop\recani\recani\similarity_matrix.pkl', 'rb') as f:
     similarity_matrix = pickle.load(f)
 
-def recommend(anime):
-    anime_index = df[df['name_english'] == anime].index[0]
-    distances = similarity_matrix[anime_index]
-    anime_list = sorted(list(enumerate(distances)), reverse=True, key = lambda x:x[1])[1:4]
-    return anime_list
-
-
-
-def update(self, anime, feedback):
-    # Update user feedback for the recommended anime
-    if anime in self.user_feedback:
-        self.user_feedback[anime]['sum_feedback'] += feedback
-        self.user_feedback[anime]['num_feedback'] += 1
-    else:
-        self.user_feedback[anime] = {'sum_feedback': feedback, 'num_feedback': 1}
-
-
-
-def recommend_anime(self):
-    # UCB1 exploration-exploitation strategy
-    exploration_constant = 2.0  # You can adjust this exploration constant
-    ucb_values = {}
-    for anime, feedback_info in self.user_feedback.items():
-        if feedback_info['num_feedback'] == 0:
-            # If no feedback received, explore by default
-            ucb_values[anime] = float('inf')
-        else:
-            average_feedback = feedback_info['sum_feedback'] / feedback_info['num_feedback']
-            exploration_term = np.sqrt((2 * np.log(self.num_rounds)) / feedback_info['num_feedback'])
-            ucb_values[anime] = average_feedback + exploration_constant * exploration_term
-    
-    # Select the anime with the highest UCB value
-    recommended_anime = max(ucb_values, key=ucb_values.get)
-    self.num_rounds += 1
-    return recommended_anime
-
-
-user_history_dict = {}
-def user_history(x):
-    global user_history_dict
-    user_history_dict[len(user_history_dict) + 1] = x
-    print(user_history_dict)
-
+# Initialize variables for three arms
 num_rounds = 0
-i = 'y'
+arm_rewards = np.zeros((3, len(df)))
+arm_pulls = np.ones((3, len(df)))
+already_recommended = [set() for _ in range(3)]  # Three sets to track recommended anime for each arm
 
-while i == 'y':
-    recommendations = recommend('One Piece')
-    temp_dict = {'anime':[], 'rating':[]}
+# Exploration function for each arm
+def explore(arm):
+    anime_index = np.random.choice(range(len(df)))
+    return anime_index
 
-    temp_dict['anime'].append(recommendations[0][0])
-    temp_dict['anime'].append(recommendations[1][0])
-    temp_dict['anime'].append(recommendations[2][0])
+# Exploitation function using UCB1 algorithm for each arm
+def exploit(arm):
+    epsilon = 0.1  # Epsilon-greedy parameter
+    ucb_values = np.zeros(len(df))
+    for anime_index in range(len(df)):
+        if arm_pulls[arm][anime_index] == 0:
+            ucb_values[anime_index] = np.inf  # Set UCB1 value to infinity for unexplored arms
+        else:
+            exploration_term = np.sqrt(2 * np.log(num_rounds + 1) / arm_pulls[arm][anime_index])  # Add 1 to avoid log(0)
+            ucb_values[anime_index] = arm_rewards[arm][anime_index] / arm_pulls[arm][anime_index] + exploration_term
 
-    for i in recommendations:
-        print(df.iloc[i[0]].name_english)
+    if np.random.random() < epsilon:
+        return np.random.choice(range(len(df)))  # Explore randomly
+    else:
+        return np.argmax(ucb_values)  # Exploit based on UCB1 values
 
-    temp_dict['rating'].append(int(input('Rate anime 1: ')))
-    temp_dict['rating'].append(int(input('Rate anime 2: ')))
-    temp_dict['rating'].append(int(input('Rate anime 3: ')))
+# Update statistics after each iteration for each arm
+def update_statistics(arm, anime_index, reward):
+    global num_rounds, arm_rewards, arm_pulls
+    num_rounds += 1
+    arm_rewards[arm][anime_index] += reward
+    arm_pulls[arm][anime_index] += 1
 
-    user_history(temp_dict)
+# Main loop for parallel arms
+while True:
+    recommendations = []
+    for arm in range(3):
+        anime_index = explore(arm) if np.random.random() < 0.1 else exploit(arm)  # Exploration with 10% probability
+        while anime_index in already_recommended[(arm + num_rounds) % 3]:  # Ensure diversity in recommendations
+            anime_index = explore(arm)
+        recommendations.append(anime_index)
+        already_recommended[(arm + num_rounds) % 3].add(anime_index)
+    
+    anime_names = [df.iloc[index].name_english for index in recommendations]
+    print(f'Recommended anime for each arm: {anime_names}')
 
-    print()
-    i = input('Want to continue y/n: ')
+    # Simulate user feedback (assuming user provides ratings)
+    ratings = []
+    for _ in range(3):
+        rating = input('Rate anime (0-5) for this arm: ')
+        while not rating.isdigit() or int(rating) < 0 or int(rating) > 5:
+            print('Invalid rating! Please enter a number between 0 and 5.')
+            rating = input('Rate anime (0-5) for this arm: ')
+        ratings.append(int(rating))
+
+    for arm, anime_index in enumerate(recommendations):
+        update_statistics(arm, anime_index, ratings[arm])
+
+    # Optionally, you can check if the user wants to continue
+    continue_response = input('Want to continue? (y/n): ')
+    if continue_response.lower() != 'y':
+        break
