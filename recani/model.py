@@ -2,71 +2,106 @@ import pandas as pd
 import numpy as np
 import pickle
 
-# Load dataset and similarity matrix
 df = pd.read_csv(r'C:\Users\22213\OneDrive\Desktop\recani\recani\word2vec_prac_dataset.csv')
+
 with open(r'C:\Users\22213\OneDrive\Desktop\recani\recani\similarity_matrix.pkl', 'rb') as f:
     similarity_matrix = pickle.load(f)
 
-# Initialize variables for three arms
-num_rounds = 0
-arm_rewards = np.zeros((3, len(df)))
-arm_pulls = np.ones((3, len(df)))
-already_recommended = [set() for _ in range(3)]  # Three sets to track recommended anime for each arm
+round_no = 0
+arm1_t = 1
+arm2_t = 1
+arm3_t = 1
 
-# Exploration function for each arm
-def explore(arm):
-    anime_index = np.random.choice(range(len(df)))
-    return anime_index
+user_history_dict = {
+    'already_recommended' : [],
+    'arm1' : {'anime':[], 'rating':[], 't': 1},
+    'arm2' : {'anime':[], 'rating':[], 't': 1},
+    'arm3' : {'anime':[], 'rating':[], 't': 1}
+}
 
-# Exploitation function using UCB1 algorithm for each arm
-def exploit(arm):
-    epsilon = 0.1  # Epsilon-greedy parameter
-    ucb_values = np.zeros(len(df))
-    for anime_index in range(len(df)):
-        if arm_pulls[arm][anime_index] == 0:
-            ucb_values[anime_index] = np.inf  # Set UCB1 value to infinity for unexplored arms
-        else:
-            exploration_term = np.sqrt(2 * np.log(num_rounds + 1) / arm_pulls[arm][anime_index])  # Add 1 to avoid log(0)
-            ucb_values[anime_index] = arm_rewards[arm][anime_index] / arm_pulls[arm][anime_index] + exploration_term
-
-    if np.random.random() < epsilon:
-        return np.random.choice(range(len(df)))  # Explore randomly
+def user_history(temp_dict, arm):
+    global user_history_dict, round_no
+    round_no += 1
+    if len(temp_dict) == 2:
+        user_history_dict['already_recommended'].extend(temp_dict['anime'])
+        user_history_dict[f'arm{arm}']['anime'].extend(temp_dict['anime'])
+        user_history_dict[f'arm{arm}']['rating'].extend(temp_dict['rating'])
     else:
-        return np.argmax(ucb_values)  # Exploit based on UCB1 values
+        for i in range(3):
+            user_history_dict['already_recommended'].extend(temp_dict[f'arm{i+1}']['anime'])
+            user_history_dict[f'arm{i+1}']['anime'].extend(temp_dict[f'arm{i+1}']['anime'])
+            user_history_dict[f'arm{i+1}']['rating'].extend(temp_dict[f'arm{i+1}']['rating'])
+    print('your history: ', user_history_dict)
+    print(round_no)
 
-# Update statistics after each iteration for each arm
-def update_statistics(arm, anime_index, reward):
-    global num_rounds, arm_rewards, arm_pulls
-    num_rounds += 1
-    arm_rewards[arm][anime_index] += reward
-    arm_pulls[arm][anime_index] += 1
 
-# Main loop for parallel arms
-while True:
-    recommendations = []
-    for arm in range(3):
-        anime_index = explore(arm) if np.random.random() < 0.1 else exploit(arm)  # Exploration with 10% probability
-        while anime_index in already_recommended[(arm + num_rounds) % 3]:  # Ensure diversity in recommendations
-            anime_index = explore(arm)
-        recommendations.append(anime_index)
-        already_recommended[(arm + num_rounds) % 3].add(anime_index)
+def UCB():
+    global user_history_dict, round_no
+    ucb_values = {}
+    for i in range(3):
+        t = user_history_dict[f'arm{i+1}']['t']
+        ratings = user_history_dict[f'arm{i+1}']['rating']
+        average_rating = sum(ratings) / len(ratings)
+        exploration_term = np.sqrt(2*(np.log(round_no))/t)
+        ucb_values[i+1] = average_rating + exploration_term
     
-    anime_names = [df.iloc[index].name_english for index in recommendations]
-    print(f'Recommended anime for each arm: {anime_names}')
+    print('ucb_values: ',ucb_values)
+    
+    return max(ucb_values, key=ucb_values.get)
 
-    # Simulate user feedback (assuming user provides ratings)
-    ratings = []
-    for _ in range(3):
-        rating = input('Rate anime (0-5) for this arm: ')
-        while not rating.isdigit() or int(rating) < 0 or int(rating) > 5:
-            print('Invalid rating! Please enter a number between 0 and 5.')
-            rating = input('Rate anime (0-5) for this arm: ')
-        ratings.append(int(rating))
+def recommend(arm):
+    global user_history_dict
+    similar_anime = []
+    anime_list = []
 
-    for arm, anime_index in enumerate(recommendations):
-        update_statistics(arm, anime_index, ratings[arm])
+    for shown in user_history_dict[f'arm{arm}']['anime']:
+        distances = similarity_matrix[shown]
+        anime_list.extend(sorted(list(enumerate(distances)), reverse=True, key = lambda x:x[1])[1:10])
 
-    # Optionally, you can check if the user wants to continue
-    continue_response = input('Want to continue? (y/n): ')
-    if continue_response.lower() != 'y':
+    similar_anime.extend(sorted(anime_list, reverse=True, key = lambda x:x[1]))
+    anime_list = []
+    anime_list.extend([i[0] for i in similar_anime])
+    recommendations = [i for i in similar_anime if i not in user_history_dict['already_recommended']][:3]
+    
+    return recommendations
+
+while True:
+    temp_dict = {
+        'anime' : [],
+        'rating' : []
+    }
+    user_input = {
+    'arm1' : {'anime':[20], 'rating':[2],},
+    'arm2' : {'anime':[224], 'rating':[4],},
+    'arm3' : {'anime':[1], 'rating':[5],}
+    }
+
+    if round_no == 0:
+        user_history(user_input, 0)
+
+    else:
+        arm = UCB()
+
+        for i in range(1,4):
+            if arm == i:
+                user_history_dict[f'arm{i}']['t'] += 1
+
+        recommendations = recommend(arm)
+        recommendations = [i[0] for i in recommendations]
+        print(recommendations)
+
+        for i in range(3):
+            print(i, ') ', df.iloc[recommendations[i]].name_english)
+
+        for i in recommendations:
+            print(i)
+            temp_dict['anime'].append(i)
+            temp_dict['rating'].append(int(input(f'Rate anime: ')))
+
+        user_history(temp_dict, arm)
+
+
+    i = input('Want to continue(y/n):')
+    if i == 'n':
         break
+
