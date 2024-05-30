@@ -2,9 +2,9 @@ import pandas as pd
 import numpy as np
 import pickle
 
-df = pd.read_csv(r'C:\Users\22213\OneDrive\Desktop\recani\recani\word2vec_prac_dataset.csv')
+df = pd.read_csv(r'C:\Users\22213\OneDrive\Desktop\recani\recani\data and model\test_data_pre_processed.csv')
 
-with open(r'C:\Users\22213\OneDrive\Desktop\recani\recani\similarity_matrix.pkl', 'rb') as f:
+with open(r'C:\Users\22213\OneDrive\Desktop\recani\recani\data and model\similarity_matrix.pkl', 'rb') as f:
     similarity_matrix = pickle.load(f)
 
 round_no = 0
@@ -68,6 +68,7 @@ def recommend(arm):
 while True:
     temp_dict = {
         'anime' : [],
+        
         'rating' : []
     }
     user_input = {
