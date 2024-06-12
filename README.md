@@ -1,6 +1,3 @@
-Here is the content converted into a markdown file format:
-
-markdown
 # Recani: Hybrid Anime Recommender
 
 Recani is a hybrid anime recommender system utilizing a multi-armed bandit algorithm. This project aims to provide personalized anime recommendations by combining content-based filtering and collaborative filtering techniques.
