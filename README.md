@@ -79,5 +79,3 @@ We welcome contributions from the community! If you have suggestions, bug report
 ## License
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
-
-Save this content into a file named README.md in your repository.
